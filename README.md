@@ -17,7 +17,18 @@ NeuroTap is a Machine Learning–based web application that detects the risk of 
 - Streamlit
 - NumPy, Pandas
 
+## 📦 Model Files
+
+The trained model (`parkinson_model.pkl`) and scaler (`scaler.pkl`) are not included in this repository.
+
+To run the app:
+- Train the model using the provided notebook (or your own dataset)
+- Place the generated `.pkl` files in the project root
+
+This follows standard ML deployment practices.
+
 ## ▶️ How to Run
 ```bash
 pip install -r requirements.txt
 streamlit run app.py
+
