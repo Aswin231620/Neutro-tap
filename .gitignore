@@ -1,0 +1,15 @@
+# Virtual environments
+neurotap_env/
+venv/
+.env/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Model files (optional – remove if you WANT to track them)
+*.pkl
+
+# OS / editor
+.vscode/
+.DS_Store
