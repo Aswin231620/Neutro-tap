@@ -1,8 +1,8 @@
 streamlit
 numpy
 pandas
-scikit-learn
-joblib
+scikit-learn==1.6.1
 librosa
-matplotlib
-reportlab
+joblib
+soundfile
+scipy
