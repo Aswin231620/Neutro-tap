@@ -1,9 +1,9 @@
 streamlit
-pandas
 numpy
-scikit-learn==1.6.1
+pandas
+scikit-learn
 joblib
-librosa
-soundfile
-reportlab
+librosa==0.9.2
+numba==0.56.4
 matplotlib
+reportlab
