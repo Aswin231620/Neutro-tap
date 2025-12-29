@@ -8,7 +8,7 @@ __pycache__/
 *.pyc
 
 # Model files (optional – remove if you WANT to track them)
-*.pkl
+#*.pkl
 
 # OS / editor
 .vscode/
