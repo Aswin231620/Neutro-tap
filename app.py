@@ -7,7 +7,6 @@ import tempfile
 import matplotlib.pyplot as plt
 import io
 import os
-
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
@@ -41,19 +40,9 @@ st.caption(
 )
 st.divider()
 
-# ================= LOAD MODEL (DEPLOYMENT SAFE) =================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-MODEL_PATH = os.path.join(BASE_DIR, "parkinson_model.pkl")
-SCALER_PATH = os.path.join(BASE_DIR, "scaler.pkl")
-
-@st.cache_resource
-def load_artifacts():
-    model = joblib.load(MODEL_PATH)
-    scaler = joblib.load(SCALER_PATH)
-    return model, scaler
-
-model, scaler = load_artifacts()
+# ================= LOAD MODEL (LOCAL) =================
+model = joblib.load("parkinson_model.pkl")
+scaler = joblib.load("scaler.pkl")
 EXPECTED_FEATURES = list(scaler.feature_names_in_)
 
 # ================= HELPERS =================
@@ -79,15 +68,12 @@ def generate_pdf(prob, risk):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     c.setFont("Helvetica", 12)
-
     c.drawString(50, 800, "NeuroTap – Parkinson Voice Analysis Report")
     c.drawString(50, 770, f"Risk Level: {risk}")
     c.drawString(50, 750, f"Prediction Confidence: {prob*100:.2f}%")
-
     c.drawString(50, 710, "Disclaimer:")
     c.drawString(50, 690, "This report is AI‑assisted and not a medical diagnosis.")
     c.drawString(50, 670, "Consult a neurologist for clinical evaluation.")
-
     c.showPage()
     c.save()
     buffer.seek(0)
@@ -98,7 +84,6 @@ def radar_chart(features):
     angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False)
     values = np.concatenate((features, [features[0]]))
     angles = np.concatenate((angles, [angles[0]]))
-
     fig, ax = plt.subplots(subplot_kw={"polar": True})
     ax.plot(angles, values)
     ax.fill(angles, values, alpha=0.3)
@@ -110,10 +95,8 @@ def extract_features(audio_path):
     y, sr = librosa.load(audio_path, sr=None)
     mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
     mfcc_mean = np.mean(mfcc, axis=1)
-
     padded = np.zeros(len(EXPECTED_FEATURES))
     padded[:len(mfcc_mean)] = mfcc_mean
-
     return pd.DataFrame([padded], columns=EXPECTED_FEATURES)
 
 # ================= SIDEBAR =================
@@ -123,11 +106,6 @@ mode = st.sidebar.radio(
     ["CSV (Extracted Features)", "Audio (.wav)"]
 )
 
-st.sidebar.info(
-    "Upload extracted voice features (CSV) "
-    "or a raw voice recording (.wav)."
-)
-
 # ================= MAIN CONTENT =================
 if mode == "CSV (Extracted Features)":
     st.subheader("📄 Upload CSV with Voice Features")
@@ -135,8 +113,7 @@ if mode == "CSV (Extracted Features)":
 
     if uploaded_file:
         data = pd.read_csv(uploaded_file)
-        data = data[[c for c in EXPECTED_FEATURES if c in data.columns]]
-
+        data = data[EXPECTED_FEATURES]
         scaled = scaler.transform(data)
         probas = model.predict_proba(scaled)[:, 1]
         preds = model.predict(scaled)
@@ -145,7 +122,7 @@ if mode == "CSV (Extracted Features)":
         data["Risk (%)"] = (probas * 100).round(2)
 
         st.success("Prediction Completed Successfully")
-        st.dataframe(data, width="stretch")
+        st.dataframe(data)
 
 else:
     st.subheader("🎤 Upload Voice Recording (.wav)")
@@ -158,8 +135,8 @@ else:
 
         features_df = extract_features(audio_path)
         scaled = scaler.transform(features_df)
-
         prob = model.predict_proba(scaled)[0][1]
+
         risk, icon = get_risk_level(prob)
 
         st.divider()
@@ -178,14 +155,6 @@ else:
             )
 
         st.progress(int(prob * 100))
-
-        if prob < 0.3:
-            st.success("Voice features are within normal range.")
-        elif prob < 0.6:
-            st.warning("Mild voice irregularities detected. Early screening advised.")
-        else:
-            st.error("High risk detected. Medical consultation recommended.")
-
         st.info(f"🧠 Estimated Condition: **{disease_stage(prob)}**")
 
         st.subheader("📈 Voice Feature Visualization")
