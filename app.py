@@ -6,6 +6,7 @@ import librosa
 import tempfile
 import matplotlib.pyplot as plt
 import io
+import os
 
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
@@ -20,17 +21,14 @@ st.set_page_config(
 # ================= CUSTOM CSS =================
 st.markdown("""
 <style>
-.main {
-    background-color: #f8fafc;
-}
-.block-container {
-    padding-top: 2rem;
-}
+.main { background-color: #f8fafc; }
+.block-container { padding-top: 2rem; }
 .metric-box {
     background-color: #ffffff;
     padding: 1rem;
-    border-radius: 10px;
+    border-radius: 12px;
     border: 1px solid #e5e7eb;
+    text-align: center;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -38,16 +36,24 @@ st.markdown("""
 # ================= HEADER =================
 st.title("🧠 NeuroTap")
 st.subheader("Parkinson’s Disease Detection using Voice Analysis")
-
 st.caption(
     "An AI‑assisted tool for early Parkinson’s risk screening using voice features."
 )
-
 st.divider()
 
-# ================= LOAD MODEL =================
-model = joblib.load("parkinson_model.pkl")
-scaler = joblib.load("scaler.pkl")
+# ================= LOAD MODEL (DEPLOYMENT SAFE) =================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+MODEL_PATH = os.path.join(BASE_DIR, "parkinson_model.pkl")
+SCALER_PATH = os.path.join(BASE_DIR, "scaler.pkl")
+
+@st.cache_resource
+def load_artifacts():
+    model = joblib.load(MODEL_PATH)
+    scaler = joblib.load(SCALER_PATH)
+    return model, scaler
+
+model, scaler = load_artifacts()
 EXPECTED_FEATURES = list(scaler.feature_names_in_)
 
 # ================= HELPERS =================
@@ -80,7 +86,7 @@ def generate_pdf(prob, risk):
 
     c.drawString(50, 710, "Disclaimer:")
     c.drawString(50, 690, "This report is AI‑assisted and not a medical diagnosis.")
-    c.drawString(50, 670, "Consult a neurologist for professional evaluation.")
+    c.drawString(50, 670, "Consult a neurologist for clinical evaluation.")
 
     c.showPage()
     c.save()
@@ -90,7 +96,6 @@ def generate_pdf(prob, risk):
 def radar_chart(features):
     labels = EXPECTED_FEATURES[:len(features)]
     angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False)
-
     values = np.concatenate((features, [features[0]]))
     angles = np.concatenate((angles, [angles[0]]))
 
@@ -113,26 +118,23 @@ def extract_features(audio_path):
 
 # ================= SIDEBAR =================
 st.sidebar.header("⚙️ Input Settings")
-
 mode = st.sidebar.radio(
     "Choose Input Type",
     ["CSV (Extracted Features)", "Audio (.wav)"]
 )
 
 st.sidebar.info(
-    "Upload either extracted voice features (CSV) "
+    "Upload extracted voice features (CSV) "
     "or a raw voice recording (.wav)."
 )
 
 # ================= MAIN CONTENT =================
 if mode == "CSV (Extracted Features)":
     st.subheader("📄 Upload CSV with Voice Features")
-
     uploaded_file = st.file_uploader("Upload CSV File", type=["csv"])
 
     if uploaded_file:
         data = pd.read_csv(uploaded_file)
-
         data = data[[c for c in EXPECTED_FEATURES if c in data.columns]]
 
         scaled = scaler.transform(data)
@@ -143,11 +145,10 @@ if mode == "CSV (Extracted Features)":
         data["Risk (%)"] = (probas * 100).round(2)
 
         st.success("Prediction Completed Successfully")
-        st.dataframe(data, use_container_width=True)
+        st.dataframe(data, width="stretch")
 
 else:
-    st.subheader("🎤 Upload Voice Recording")
-
+    st.subheader("🎤 Upload Voice Recording (.wav)")
     audio_file = st.file_uploader("Upload WAV File", type=["wav"])
 
     if audio_file:
@@ -161,18 +162,15 @@ else:
         prob = model.predict_proba(scaled)[0][1]
         risk, icon = get_risk_level(prob)
 
-        # ================= RESULTS =================
         st.divider()
         st.subheader("📊 Analysis Result")
 
         col1, col2 = st.columns(2)
-
         with col1:
             st.markdown(
                 f"<div class='metric-box'><h4>{icon} Risk Level</h4><h2>{risk}</h2></div>",
                 unsafe_allow_html=True
             )
-
         with col2:
             st.markdown(
                 f"<div class='metric-box'><h4>Confidence</h4><h2>{prob*100:.2f}%</h2></div>",
@@ -182,22 +180,20 @@ else:
         st.progress(int(prob * 100))
 
         if prob < 0.3:
-            st.success("Voice features appear within normal range.")
+            st.success("Voice features are within normal range.")
         elif prob < 0.6:
             st.warning("Mild voice irregularities detected. Early screening advised.")
         else:
-            st.error("Significant abnormalities detected. Medical consultation recommended.")
+            st.error("High risk detected. Medical consultation recommended.")
 
         st.info(f"🧠 Estimated Condition: **{disease_stage(prob)}**")
 
-        # ================= VISUAL =================
         st.subheader("📈 Voice Feature Visualization")
         radar_chart(features_df.iloc[0].values[:10])
 
-        # ================= PDF =================
         pdf = generate_pdf(prob, risk)
         st.download_button(
-            "📄 Download Medical Report (PDF)",
+            "📄 Download Report (PDF)",
             data=pdf,
             file_name="NeuroTap_Report.pdf",
             mime="application/pdf"
@@ -206,6 +202,6 @@ else:
 # ================= FOOTER =================
 st.divider()
 st.caption(
-    "⚠️ For educational and research purposes only. "
-    "This system does not replace professional medical diagnosis."
+    "⚠️ This application is for educational and research purposes only. "
+    "It does not replace professional medical diagnosis."
 )
